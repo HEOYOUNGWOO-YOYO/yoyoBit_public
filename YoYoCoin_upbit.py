@@ -5,8 +5,8 @@ import logging
 import os
 
 # API 키
-access = "IUfyYFITfEMMXIzgF0xGilgEi7vxETUDXM7f9v4b"
-secret = "k7FDKD4JlxOESxG42sxlZ8cBkkszK0bgdXerxjGM"
+access = ""
+secret = ""
 
 # 로그 설정
 logging.basicConfig(
