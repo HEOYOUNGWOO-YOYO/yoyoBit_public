@@ -5,8 +5,8 @@ import logging
 import os
 
 # API 키
-access = ""
-secret = ""
+access = "IUfyYFITfEMMXIzgF0xGilgEi7vxETUDXM7f9v4b"
+secret = "k7FDKD4JlxOESxG42sxlZ8cBkkszK0bgdXerxjGM"
 
 # 로그 설정
 logging.basicConfig(
@@ -95,7 +95,7 @@ def get_moving_average(ticker, window=15):
 
 # 로그인
 try:
-    COIN = os.getenv("COIN", "XRP")  # 환경 변수에서 COIN 값 가져오기, 기본값으로 'BTC' 사용
+    COIN = os.getenv("COIN", "BTC")  # 환경 변수에서 COIN 값 가져오기, 기본값으로 'BTC' 사용
     upbit = pyupbit.Upbit(access, secret)
     logging.info(f"RSI-based auto-trade started for {COIN}.")
 except Exception as e:
@@ -111,19 +111,28 @@ previous_rsi_above_70 = False
 
 while True:
     try:
-        # 전날 최고가 대비 10% 하락 여부 체크
-        if last_day_high is not None:
-            current_btc_price = get_current_price("KRW-BTC")
-            if current_btc_price is not None and current_btc_price <= last_day_high * 0.9:
-                halt_until = datetime.datetime.now() + datetime.timedelta(hours=12)
-                logging.warning(f"BTC price dropped 10% from previous day high. Halting trades until {halt_until}")
-                last_day_high = None  # 한 번 감지하면 다시 체크하지 않음
-
         # 거래 중지 시간 체크
         if halt_until is not None and datetime.datetime.now() < halt_until:
             logging.info("Trading is halted due to BTC price drop. Waiting...")
             time.sleep(60)
             continue
+        elif halt_until is not None and datetime.datetime.now() >= halt_until:
+            logging.info("Resuming trading after halt period.")
+            halt_until = None
+            last_day_high = get_previous_day_high()  # 거래 재개 후 전날 최고가 다시 설정
+
+        # 전날 최고가 대비 10% 하락 여부 체크
+        if last_day_high is not None:
+            current_btc_price = get_current_price("KRW-BTC")
+            if current_btc_price is not None and current_btc_price <= last_day_high * 0.9:
+                # 모든 자산 매도
+                coin_balance = get_balance(COIN)
+                if coin_balance > 0.00008:
+                    upbit.sell_market_order(f"KRW-{COIN}", coin_balance * 0.9995)  # 수수료 고려
+                    logging.info(f"Sell all {COIN} to convert total assets to KRW before halting: {coin_balance}")
+                halt_until = datetime.datetime.now() + datetime.timedelta(hours=12)
+                logging.warning(f"BTC price dropped 10% from previous day high. Halting trades until {halt_until}")
+                last_day_high = None  # 한 번 감지하면 다시 체크하지 않음
 
         # RSI 계산
         rsi = get_rsi(f"KRW-{COIN}", interval="minute15")
@@ -160,7 +169,7 @@ while True:
 
         # 매도 로직
         coin_balance = get_balance(COIN)
-        if 60 <= rsi <= 70 and coin_balance > 0.00008:
+        if 68 <= rsi <= 69.9 and coin_balance > 0.00008:
             target_krw_amount = total_assets * 0.5
             coin_to_sell = (target_krw_amount - krw_balance) / current_price
             if coin_to_sell > 0.00008 and coin_to_sell <= coin_balance:  # 최소 거래 가능 수량 고려
@@ -186,3 +195,4 @@ while True:
     except Exception as e:
         logging.error(f"Error in main loop: {e}")
         time.sleep(15)
+
